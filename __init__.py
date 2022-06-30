@@ -19,32 +19,51 @@ import sqlite3
 class Contacts(MycroftSkill):
     def __init__(self):
         MycroftSkill.__init__(self)
-        con = sqlite3.connect("file:contacts.db?mode=rwc", uri=True)
-        con.executescript("CREATE TABLE IF NOT EXISTS contacts(`name` TEXT, `email` TEXT, `phone` TEXT)")
+        con = self.get_con("rwc")
+        con.executescript("CREATE TABLE IF NOT EXISTS contacts(`name` TEXT NOT NULL, `email` TEXT NOT NULL UNIQUE, `phone` TEXT NOT NULL UNIQUE)")
+        self.commit(con)
+    
+    def get_con(self, mode="rw"):
+        return sqlite3.connect(f"file:contacts.db?mode={mode}", uri=True)
+    
+    def commit(self, con):
         con.commit()
         con.close()
 
     @intent_handler("AddContact.intent")
     def add_contact(self, message):
-        self.speak_dialog("Självfallet, du kommer nu få ange kontaktuppgifter")
         name  = self.get_response("AskForName")
         self.speak(name)
         email = self.get_response("AskForEmail")
+        email = email.replace("punkt", ".").replace("snabel-a", "@").replace(" ", "")
         self.speak(email)
         phone = self.get_response("AskForPhone")
+        phone = phone.replace("-", "").replace(" ", "")
         self.speak(phone)
 
-        con = sqlite3.connect("file:contacts.db?mode=rw", uri=True)
-        con.execute("INSERT INTO contacts VALUES(?, ?, ?)", (name, email, phone))
-        con.commit()
-        con.close()
+        if not name or not email or not phone:
+            self.speak_dialog("CouldNotAdd")
+            return
+
+        try:
+            con = self.get_con()
+            con.execute("INSERT INTO contacts VALUES(?, ?, ?)", (name, email, phone))
+            self.speak_dialog("ContactAdded", data={"name": name, "email": email, "phone": phone})
+        except sqlite3.IntegrityError as err:
+            self.speak_dialog("NotUnique")
+        except Exception:
+            self.speak_dialog("CouldNotAdd")
+
+        self.commit(con)
     
     @intent_handler("RemoveContact.intent")
     def remove_contact(self, message):
+
         response = self.get_response("Who")
         if response:
             self.speak("Tar bort kontakten: " + response)
-            self.log.info(sqlite3.connect("file:contacts.db?mode=rw", uri=True).execute("SELECT * FROM contacts WHERE name=?", (response,)).fetchone())
+            con = self.get_con()
+            self.log.info(con.execute("SELECT * FROM contacts WHERE name=?", (response,)).fetchone())
 
 
 def create_skill():
