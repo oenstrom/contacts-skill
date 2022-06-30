@@ -19,6 +19,10 @@ import sqlite3
 class Contacts(MycroftSkill):
     def __init__(self):
         MycroftSkill.__init__(self)
+        con = sqlite3.connect("file:contacts.db?mode=rwc", uri=True)
+        con.executescript("CREATE TABLE IF NOT EXISTS contacts(`name` TEXT, `email` TEXT, `phone` TEXT)")
+        con.commit()
+        con.close()
 
     @intent_handler("AddContact.intent")
     def add_contact(self, message):
@@ -30,17 +34,17 @@ class Contacts(MycroftSkill):
         phone = self.get_response("AskForPhone")
         self.speak(phone)
 
-        # if name is None:
-        #     return self.start_meeting_unspecified_name(message)
-
-        self.__start_meeting(name)
+        con = sqlite3.connect("file:contacts.db?mode=rw", uri=True)
+        con.execute("INSERT INTO contacts VALUES(?, ?, ?)", (name, email, phone))
+        con.commit()
+        con.close()
     
     @intent_handler("RemoveContact.intent")
     def remove_contact(self, message):
         response = self.get_response("Who")
         if response:
             self.speak("Tar bort kontakten: " + response)
-            pass
+            self.log.info(sqlite3.connect("file:contacts.db?mode=rw", uri=True).execute("SELECT * FROM contacts WHERE name=?", (response,)).fetchone())
 
 
 def create_skill():
