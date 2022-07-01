@@ -107,7 +107,8 @@ class Contacts(MycroftSkill):
     def __display_contacts(self, contacts):
         """Post list of contacts to MagicMirror (or some other http endpoint)"""
         self.log.info(contacts)
-        res = requests.post("http://localhost:8080/MMM-contacts/list", {"contacts": contacts})
+        # TODO: Fix json body
+        res = requests.post("http://localhost:8080/MMM-contacts/list", json={"contacts": contacts})
         self.log.info(res)
         # TODO: Handle post fail?
         return res
