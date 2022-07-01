@@ -15,6 +15,7 @@
 
 from mycroft import MycroftSkill, intent_handler
 import sqlite3
+import requests
 
 class Contacts(MycroftSkill):
     def __init__(self):
@@ -52,18 +53,41 @@ class Contacts(MycroftSkill):
         except sqlite3.IntegrityError as err:
             self.speak_dialog("NotUnique")
         except Exception:
-            self.speak_dialog("CouldNotAdd")
+            self.speak_dialog("Error")
 
         self.commit(con)
     
     @intent_handler("RemoveContact.intent")
     def remove_contact(self, message):
+        """Ask for the contact to be removed. If multiple contacts are found use ask_selection and match by phone number."""
 
         response = self.get_response("Who")
         if response:
-            self.speak("Tar bort kontakten: " + response)
-            con = self.get_con()
-            self.log.info(con.execute("SELECT * FROM contacts WHERE name=?", (response,)).fetchone())
+            try:
+                con = self.get_con()
+                contact_list = con.execute("SELECT * FROM contacts WHERE name=?", (response,)).fetchall()
+            except Exception:
+                self.speak_dialog("Error")
+
+            if len(contact_list) <= 0:
+                self.speak_dialog("NotFound")
+                return
+
+            if len(contact_list) > 1:
+                # TODO: Handle post fail
+                res = requests.post("http://localhost:8080/MMM-contacts", {"contacts": contact_list})
+                response = self.ask_selection(contact_list, "WhoFromSelection")
+            
+            self.__delete_contact(response)
+    
+    def __delete_contact(self, contact, con):
+        """Try to delete the contact from the database."""
+        try:
+            con.execute("DELETE FROM contacts WHERE name=? AND email=? AND phone=?", (contact.name, contact.email, contact.phone))
+            self.commit(con)
+            self.speak_dialog("ContactRemoved", data={"name": contact.name, "phone": contact.phone})
+        except Exception:
+            self.speak_dialog("Error")
 
 
 def create_skill():
