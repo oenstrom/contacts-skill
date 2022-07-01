@@ -31,8 +31,10 @@ class Contacts(MycroftSkill):
         con.commit()
         con.close()
 
+
     @intent_handler("AddContact.intent")
     def add_contact(self, message):
+        """Ask for name, email and phone number. Then try to insert that contact into the database."""
         name  = self.get_response("AskForName")
         self.speak(name)
         email = self.get_response("AskForEmail")
@@ -50,13 +52,25 @@ class Contacts(MycroftSkill):
             con = self.get_con()
             con.execute("INSERT INTO contacts VALUES(?, ?, ?)", (name, email, phone))
             self.speak_dialog("ContactAdded", data={"name": name, "email": email, "phone": phone})
+            self.commit(con)
         except sqlite3.IntegrityError as err:
             self.speak_dialog("NotUnique")
         except Exception:
             self.speak_dialog("Error")
 
-        self.commit(con)
-    
+
+    @intent_handler("ListContacts.intent")
+    def list_contacts(self, message):
+        """List all contacts"""
+        try:
+            con = self.get_con()
+            contact_list = con.execute("SELECT * FROM contacts ORDER BY name ASC").fetchall()
+            self.__display_contacts(contact_list)
+            self.speak_dialog("ShowContacts")
+        except Exception:
+            self.speak_dialog("Error")
+
+
     @intent_handler("RemoveContact.intent")
     def remove_contact(self, message):
         """Ask for the contact to be removed. If multiple contacts are found use ask_selection and match by phone number."""
@@ -75,7 +89,7 @@ class Contacts(MycroftSkill):
 
             if len(contact_list) > 1:
                 # TODO: Handle post fail
-                res = requests.post("http://localhost:8080/MMM-contacts", {"contacts": contact_list})
+                res = self.__display_contacts(contact_list)
                 response = self.ask_selection(contact_list, "WhoFromSelection")
             
             self.__delete_contact(response)
@@ -88,7 +102,15 @@ class Contacts(MycroftSkill):
             self.speak_dialog("ContactRemoved", data={"name": contact.name, "phone": contact.phone})
         except Exception:
             self.speak_dialog("Error")
+    
 
+    def __display_contacts(self, contacts):
+        """Post list of contacts to MagicMirror (or some other http endpoint)"""
+        self.log.info(contacts)
+        res = requests.post("http://localhost:8080/MMM-contacts/list", {"contacts": contacts})
+        self.log.info(res)
+        # TODO: Handle post fail?
+        return res
 
 def create_skill():
     return Contacts()
