@@ -14,6 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from mycroft import MycroftSkill, intent_handler
+from mycroft.messagebus import Message
 import sqlite3
 import requests
 
@@ -67,7 +68,8 @@ class Contacts(MycroftSkill):
             contact_list = con.execute("SELECT * FROM contacts ORDER BY name ASC").fetchall()
             self.__display_contacts(contact_list)
             self.speak_dialog("ShowContacts")
-        except Exception:
+        except Exception as e:
+            self.log.info(e)
             self.speak_dialog("Error")
 
 
@@ -108,10 +110,11 @@ class Contacts(MycroftSkill):
         """Post list of contacts to MagicMirror (or some other http endpoint)"""
         self.log.info(contacts)
         # TODO: Fix json body
-        res = requests.post("http://localhost:8080/MMM-contacts/list", json={"contacts": contacts})
-        self.log.info(res)
+        self.bus.emit(Message("MMM_DISPLAY_CONTACTS", {"contacts": contacts}))
+        # res = requests.post("http://localhost:8080/MMM-contacts/list", headers={"Content-Type": "application/json"}, json={"contacts": contacts})
+        # self.log.info(res)
         # TODO: Handle post fail?
-        return res
+        # return res
 
 def create_skill():
     return Contacts()
