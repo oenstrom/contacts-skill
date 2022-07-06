@@ -107,14 +107,9 @@ class Contacts(MycroftSkill):
     
 
     def __display_contacts(self, contacts):
-        """Post list of contacts to MagicMirror (or some other http endpoint)"""
+        """Send list of contacts over the messagebus"""
         self.log.info(contacts)
-        # TODO: Fix json body
-        self.bus.emit(Message("MMM_DISPLAY_CONTACTS", {"contacts": contacts}))
-        # res = requests.post("http://localhost:8080/MMM-contacts/list", headers={"Content-Type": "application/json"}, json={"contacts": contacts})
-        # self.log.info(res)
-        # TODO: Handle post fail?
-        # return res
+        self.bus.emit(Message("RELAY:MMM-contacts:LIST-ALL", {"contacts": contacts}))
 
 def create_skill():
     return Contacts()
