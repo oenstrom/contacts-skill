@@ -25,6 +25,17 @@ class Contacts(MycroftSkill):
         self.con.commit()
         self.con.close()
     
+    def initialize(self):
+        self.add_event("contacts-skill:delete_contact", self.handle_delete_contact_event)
+
+    def handle_delete_contact_event(self, message):
+        data = message.data
+        if data.get("name") is None or data.get("email") is None or data.get("phone") is None:
+            return
+
+        self.con = self.get_con()
+        self.__delete_contact(data, self.con)
+
     def get_con(self, mode="rw"):
         return sqlite3.connect(f"file:contacts.db?mode={mode}", uri=True)
 
@@ -104,10 +115,12 @@ class Contacts(MycroftSkill):
     def __delete_contact(self, contact, con):
         """Try to delete the contact from the database."""
         try:
-            con.execute("DELETE FROM contacts WHERE name=? AND email=? AND phone=?", (contact.name, contact.email, contact.phone))
-            self.commit(con)
-            self.speak_dialog("ContactRemoved", data={"name": contact.name, "phone": contact.phone})
-        except Exception:
+            con.execute("DELETE FROM contacts WHERE name=? AND email=? AND phone=?", (contact["name"], contact["email"], contact["phone"]))
+            con.commit()
+            self.speak_dialog("ContactRemoved", data=contact)
+            self.__display_contacts(self.__get_contacts(con))
+        except Exception as e:
+            self.log.info(e)
             self.speak_dialog("Error")
         finally:
             con.close()

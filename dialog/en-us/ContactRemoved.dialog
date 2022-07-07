@@ -1,2 +1,2 @@
-The contact {name} with phone number {phone} has been removed
-{name} with phone number {phone} has been removed
+The contact {name} with phone number {phone} and email {email} has been removed
+{name} with email {email} and phone number {phone} has been removed

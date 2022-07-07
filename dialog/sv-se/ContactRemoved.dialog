@@ -1,2 +1,2 @@
-Kontakten {name} med telefonnummer {phone} har tagits bort
-{name} som hade telefonnummer {phone} har tagits bort
+Kontakten {name} med telefonnummer {phone} och e-postadress {email} har tagits bort
+{name} som hade e-postadress {email} och telefonnummer {phone} har tagits bort
