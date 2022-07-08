@@ -16,6 +16,7 @@
 from mycroft import MycroftSkill, intent_handler
 from mycroft.messagebus import Message
 import sqlite3
+import os
 
 class Contacts(MycroftSkill):
     def __init__(self):
@@ -37,7 +38,7 @@ class Contacts(MycroftSkill):
         self.__delete_contact(data, self.con)
 
     def get_con(self, mode="rw"):
-        return sqlite3.connect(f"file:contacts.db?mode={mode}", uri=True)
+        return sqlite3.connect(f"file:{os.path.dirname(os.path.realpath(__file__))}/contacts.db?mode={mode}", uri=True)
 
     @intent_handler("AddContact.intent")
     def add_contact(self, message):
