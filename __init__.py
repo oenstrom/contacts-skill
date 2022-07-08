@@ -15,6 +15,7 @@
 
 from mycroft import MycroftSkill, intent_handler
 from mycroft.messagebus import Message
+from mycroft.util.parse import match_one, fuzzy_match
 import sqlite3
 import os
 
@@ -52,6 +53,7 @@ class Contacts(MycroftSkill):
 
     def get_con(self, mode="rw"):
         """Return a connection to the sqlite database."""
+        # TODO: Move database file to ~/mycroft-core/database or something like that
         return sqlite3.connect(f"file:{os.path.dirname(os.path.realpath(__file__))}/contacts.db?mode={mode}", uri=True)
 
     @intent_handler("AddContact.intent")
@@ -103,25 +105,50 @@ class Contacts(MycroftSkill):
         """Ask for the contact to be removed. If multiple contacts are found use ask_selection and match by phone number."""
 
         response = self.get_response("Who")
-        if response:
-            try:
-                self.con = self.get_con()
-                contact_list = self.con.execute("SELECT * FROM contacts WHERE name=?", (response,)).fetchall()
-            except Exception:
-                self.speak_dialog("Error")
-            finally:
-                self.con.close()
+        if not response:
+            return
+        
+        contact_list = []
+        try:
+            self.con = self.get_con()
+            contact_list = self.__get_contacts(self.con)
+        except Exception:
+            self.speak_dialog("Error")
+        finally:
+            self.con.close()
 
-            if len(contact_list) <= 0:
-                self.speak_dialog("NotFound")
-                return
+        if len(contact_list) <= 0:
+            self.speak_dialog("NotFound")
+            return
 
-            if len(contact_list) > 1:
-                # TODO: Handle post fail
-                res = self.__emit_all_contacts(contact_list)
-                response = self.ask_selection(contact_list, "WhoFromSelection")
-            
-            self.__delete_contact(response)
+        best_match = []
+        for c in contact_list:
+            c = list(c)
+            c.append(fuzzy_match(response.lower(), c[0].lower()))
+            if len(best_match) == 0 or c[-1] > best_match[0][-1]:
+                best_match = [c]
+            elif c[-1] == best_match[0][-1]:
+                best_match.append(c)
+
+        if len(best_match) == 1:
+            contact = {"name": best_match[0][0], "email": best_match[0][1], "phone": best_match[0][2]}
+            if self.ask_yesno("ConfirmRemove", data=contact) == "yes":
+                self.__delete_contact(contact)
+                self.__emit_all_contacts(contact_list)
+            else:
+                self.speak_dialog("NotRemoved")
+        # else:
+        #     self.ask_selection()
+        
+        # self.log.info(max(contacts, key=lambda c:c[-1]))
+        return 
+
+        if len(contact_list) > 1:
+            # TODO: Handle post fail
+            res = self.__emit_all_contacts(contact_list)
+            response = self.ask_selection(contact_list, "WhoFromSelection")
+        
+        self.__delete_contact(response)
     
     def __get_contacts(self, con):
         """Get contacts from the database."""
