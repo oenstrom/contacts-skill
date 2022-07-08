@@ -27,17 +27,31 @@ class Contacts(MycroftSkill):
         self.con.close()
     
     def initialize(self):
+        """Setup event listeners."""
         self.add_event("contacts-skill:delete_contact", self.handle_delete_contact_event)
+        self.add_event("contacts-skill:get_contacts", self.handle_get_contacts_event)
 
     def handle_delete_contact_event(self, message):
+        """Request to delete contact received over messagebus. Delete the specified contact."""
         data = message.data
         if data.get("name") is None or data.get("email") is None or data.get("phone") is None:
             return
 
-        self.con = self.get_con()
-        self.__delete_contact(data, self.con)
+        self.__delete_contact(data)
+    
+    def handle_get_contacts_event(self, message):
+        """Request for listing all contacts received over messagebus. Emit list of contacts."""
+        data = message.data
+        try:
+            self.con = self.get_con()
+            self.__emit_all_contacts(self.__get_contacts(self.con), data.get("sender", "*"))
+        except Exception as e:
+            self.log.info(e)
+        finally:
+            self.con.close()
 
     def get_con(self, mode="rw"):
+        """Return a connection to the sqlite database."""
         return sqlite3.connect(f"file:{os.path.dirname(os.path.realpath(__file__))}/contacts.db?mode={mode}", uri=True)
 
     @intent_handler("AddContact.intent")
@@ -59,7 +73,7 @@ class Contacts(MycroftSkill):
         try:
             self.con = self.get_con()
             self.con.execute("INSERT INTO contacts VALUES(?, ?, ?)", (name, email, phone))
-            self.__display_contacts(self.__get_contacts(self.con))
+            self.__emit_all_contacts(self.__get_contacts(self.con))
             self.con.commit()
             self.speak_dialog("ContactAdded", data={"name": name, "email": email, "phone": phone})
         except sqlite3.IntegrityError as err:
@@ -75,7 +89,7 @@ class Contacts(MycroftSkill):
         """List all contacts"""
         try:
             self.con = self.get_con()
-            self.__display_contacts(self.__get_contacts(self.con))
+            self.__emit_all_contacts(self.__get_contacts(self.con))
             self.speak_dialog("ShowContacts")
         except Exception as e:
             self.log.info(e)
@@ -104,7 +118,7 @@ class Contacts(MycroftSkill):
 
             if len(contact_list) > 1:
                 # TODO: Handle post fail
-                res = self.__display_contacts(contact_list)
+                res = self.__emit_all_contacts(contact_list)
                 response = self.ask_selection(contact_list, "WhoFromSelection")
             
             self.__delete_contact(response)
@@ -113,24 +127,25 @@ class Contacts(MycroftSkill):
         """Get contacts from the database."""
         return con.execute("SELECT * FROM contacts ORDER BY name ASC").fetchall()
 
-    def __delete_contact(self, contact, con):
+    def __delete_contact(self, contact):
         """Try to delete the contact from the database."""
         try:
-            con.execute("DELETE FROM contacts WHERE name=? AND email=? AND phone=?", (contact["name"], contact["email"], contact["phone"]))
-            con.commit()
+            self.con = self.get_con()
+            self.con.execute("DELETE FROM contacts WHERE name=? AND email=? AND phone=?", (contact["name"], contact["email"], contact["phone"]))
+            self.con.commit()
             self.speak_dialog("ContactRemoved", data=contact)
-            self.__display_contacts(self.__get_contacts(con))
+            self.__emit_all_contacts(self.__get_contacts(self.con))
         except Exception as e:
             self.log.info(e)
             self.speak_dialog("Error")
         finally:
-            con.close()
+            self.con.close()
     
 
-    def __display_contacts(self, contacts):
+    def __emit_all_contacts(self, contacts, receiver="MMM-contacts"):
         """Send list of contacts over the messagebus"""
         self.log.info(contacts)
-        self.bus.emit(Message("RELAY:MMM-contacts:LIST-ALL", {"contacts": contacts}))
+        self.bus.emit(Message(f"RELAY:{receiver}:LIST-ALL", {"contacts": contacts}))
 
 def create_skill():
     return Contacts()
