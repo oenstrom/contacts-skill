@@ -14,6 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from mycroft import MycroftSkill, intent_handler
+from mycroft.skills import skill_api_method
 from mycroft.messagebus import Message
 from mycroft.util.parse import match_one, fuzzy_match
 import sqlite3
@@ -39,6 +40,8 @@ class Contacts(MycroftSkill):
             return
 
         self.__delete_contact(data)
+        self.__emit_all_contacts(self.__get_contacts(self.con))
+
     
     def handle_get_contacts_event(self, message):
         """Request for listing all contacts received over messagebus. Emit list of contacts."""
@@ -103,53 +106,62 @@ class Contacts(MycroftSkill):
     @intent_handler("RemoveContact.intent")
     def remove_contact(self, message):
         """Ask for the contact to be removed. If multiple contacts are found use ask_selection and match by phone number."""
-
         response = self.get_response("Who")
         if not response:
             return
+
+        best_match, contact_list = self.get_best_match(response, True)
+        if len(best_match) == 1:
+            self.__confirm_removal({"name": best_match[0][0], "email": best_match[0][1], "phone": best_match[0][2]})
+        elif len(best_match) <= 0:
+            self.speak_dialog("NotFound", {"name": response})
+        else:
+            # self.log.info(best_match)
+            self.__emit_all_contacts(best_match)
+            selection = self.ask_selection([x[2] for x in best_match], "WhoFromSelection", numeric=True)
+            selected = [(name, email, phone) for (name, email, phone, score) in best_match if phone == selection]
+            if len(selected) == 1:
+                self.__confirm_removal({"name": selected[0][0], "email": selected[0][1], "phone": selected[0][2]})
         
+        self.__emit_all_contacts(self.__get_contacts(self.get_con()))
+        
+    
+    def __confirm_removal(self, contact):
+        """Ask yes/no to confirm removing the contact"""
+        if self.ask_yesno("ConfirmRemove", data=contact) == "yes":
+            self.__delete_contact(contact)
+        else:
+            self.speak_dialog("NotRemoved")
+    
+    @skill_api_method
+    def get_best_match(self, to_match, return_all=False):
+        """Get the contact that matches the input the best."""
         contact_list = []
         try:
             self.con = self.get_con()
             contact_list = self.__get_contacts(self.con)
         except Exception:
             self.speak_dialog("Error")
+            self.con.close()
+            return False
         finally:
             self.con.close()
 
         if len(contact_list) <= 0:
-            self.speak_dialog("NotFound")
-            return
+            self.speak_dialog("NotFound", data={"name": to_match})
+            return False
 
         best_match = []
         for c in contact_list:
             c = list(c)
-            c.append(fuzzy_match(response.lower(), c[0].lower()))
+            c.append(fuzzy_match(to_match.lower(), c[0].lower()))
             if len(best_match) == 0 or c[-1] > best_match[0][-1]:
                 best_match = [c]
             elif c[-1] == best_match[0][-1]:
                 best_match.append(c)
 
-        if len(best_match) == 1:
-            contact = {"name": best_match[0][0], "email": best_match[0][1], "phone": best_match[0][2]}
-            if self.ask_yesno("ConfirmRemove", data=contact) == "yes":
-                self.__delete_contact(contact)
-                self.__emit_all_contacts(contact_list)
-            else:
-                self.speak_dialog("NotRemoved")
-        # else:
-        #     self.ask_selection()
-        
-        # self.log.info(max(contacts, key=lambda c:c[-1]))
-        return 
+        return (best_match, contact_list) if return_all else best_match
 
-        if len(contact_list) > 1:
-            # TODO: Handle post fail
-            res = self.__emit_all_contacts(contact_list)
-            response = self.ask_selection(contact_list, "WhoFromSelection")
-        
-        self.__delete_contact(response)
-    
     def __get_contacts(self, con):
         """Get contacts from the database."""
         return con.execute("SELECT * FROM contacts ORDER BY name ASC").fetchall()
@@ -161,7 +173,6 @@ class Contacts(MycroftSkill):
             self.con.execute("DELETE FROM contacts WHERE name=? AND email=? AND phone=?", (contact["name"], contact["email"], contact["phone"]))
             self.con.commit()
             self.speak_dialog("ContactRemoved", data=contact)
-            self.__emit_all_contacts(self.__get_contacts(self.con))
         except Exception as e:
             self.log.info(e)
             self.speak_dialog("Error")
