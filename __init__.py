@@ -56,8 +56,7 @@ class Contacts(MycroftSkill):
 
     def get_con(self, mode="rw"):
         """Return a connection to the sqlite database."""
-        # TODO: Move database file to ~/mycroft-core/database or something like that
-        return sqlite3.connect(f"file:{os.path.dirname(os.path.realpath(__file__))}/contacts.db?mode={mode}", uri=True)
+        return sqlite3.connect(f"file:database/contacts-skill/contacts.db?mode={mode}", uri=True)
 
     @intent_handler("AddContact.intent")
     def add_contact(self, message):
@@ -186,7 +185,6 @@ class Contacts(MycroftSkill):
 
     def __emit_all_contacts(self, contacts, receiver="MMM-contacts"):
         """Send list of contacts over the messagebus"""
-        self.log.info(contacts)
         self.bus.emit(Message(f"RELAY:{receiver}:LIST-ALL", {"contacts": contacts}))
 
 def create_skill():
