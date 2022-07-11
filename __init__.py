@@ -110,19 +110,21 @@ class Contacts(MycroftSkill):
         if not response:
             return
 
-        best_match, contact_list = self.get_best_match(response, True)
-        if len(best_match) == 1:
-            self.__confirm_removal({"name": best_match[0][0], "email": best_match[0][1], "phone": best_match[0][2]})
-        elif len(best_match) <= 0:
+        best_match = self.get_best_match(response)
+        if len(best_match) <= 0:
             self.speak_dialog("NotFound", {"name": response})
+            return
+        elif len(best_match) == 1:
+            contact = {"name": best_match[0][0], "email": best_match[0][1], "phone": best_match[0][2]}
         else:
-            # self.log.info(best_match)
-            self.__emit_all_contacts(best_match)
-            selection = self.ask_selection([x[2] for x in best_match], "WhoFromSelection", numeric=True)
+            selection = self.ask_selection([x[2] for x in best_match], "WhoFromSelection")
             selected = [(name, email, phone) for (name, email, phone, score) in best_match if phone == selection]
             if len(selected) == 1:
-                self.__confirm_removal({"name": selected[0][0], "email": selected[0][1], "phone": selected[0][2]})
-        
+                contact = {"name": selected[0][0], "email": selected[0][1], "phone": selected[0][2]}
+            else:
+                return
+
+        self.__confirm_removal(contact)
         self.__emit_all_contacts(self.__get_contacts(self.get_con()))
         
     
@@ -134,7 +136,7 @@ class Contacts(MycroftSkill):
             self.speak_dialog("NotRemoved")
     
     @skill_api_method
-    def get_best_match(self, to_match, return_all=False):
+    def get_best_match(self, to_match):
         """Get the contact that matches the input the best."""
         contact_list = []
         try:
@@ -159,8 +161,10 @@ class Contacts(MycroftSkill):
                 best_match = [c]
             elif c[-1] == best_match[0][-1]:
                 best_match.append(c)
+        if len(best_match) > 1:
+            self.__emit_all_contacts(best_match)
 
-        return (best_match, contact_list) if return_all else best_match
+        return best_match
 
     def __get_contacts(self, con):
         """Get contacts from the database."""
