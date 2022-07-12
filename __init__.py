@@ -16,9 +16,8 @@
 from mycroft import MycroftSkill, intent_handler
 from mycroft.skills import skill_api_method
 from mycroft.messagebus import Message
-from mycroft.util.parse import match_one, fuzzy_match
+from mycroft.util.parse import fuzzy_match
 import sqlite3
-import os
 
 class Contacts(MycroftSkill):
     def __init__(self):
@@ -40,7 +39,7 @@ class Contacts(MycroftSkill):
             return
 
         self.__delete_contact(data)
-        self.__emit_all_contacts(self.__get_contacts(self.con))
+        self.__emit_all_contacts(self.__get_contacts(self.get_con()))
 
     
     def handle_get_contacts_event(self, message):
@@ -62,17 +61,15 @@ class Contacts(MycroftSkill):
     def add_contact(self, message):
         """Ask for name, email and phone number. Then try to insert that contact into the database."""
         name  = self.get_response("AskForName")
-        # self.speak(name)
         email = self.get_response("AskForEmail")
-        email = email.replace("punkt", ".").replace("snabel-a", "@").replace("snabela", "@").replace(" ", "")
-        # self.speak(email)
         phone = self.get_response("AskForPhone")
-        phone = phone.replace("-", "").replace(" ", "")
-        # self.speak(phone)
 
         if not name or not email or not phone:
             self.speak_dialog("CouldNotAdd")
             return
+
+        email = email.replace("punkt", ".").replace("snabel-a", "@").replace("snabela", "@").replace(" ", "")
+        phone = phone.replace("-", "").replace(" ", "")
 
         try:
             self.con = self.get_con()
