@@ -147,7 +147,7 @@ class Contacts(MycroftSkill):
 
         if len(contact_list) <= 0:
             self.speak_dialog("NotFound", data={"name": to_match})
-            return False
+            return []
 
         best_match = []
         for c in contact_list:
