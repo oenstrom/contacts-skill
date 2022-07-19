@@ -17,11 +17,14 @@ from mycroft import MycroftSkill, intent_handler
 from mycroft.skills import skill_api_method
 from mycroft.messagebus import Message
 from mycroft.util.parse import fuzzy_match
+from pathlib import Path
 import sqlite3
 
 class Contacts(MycroftSkill):
     def __init__(self):
         MycroftSkill.__init__(self)
+        self.db_path = Path(Path.home(), "mycroft-core", "database", "contacts-skill", "contacts.db")
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.con = self.get_con("rwc")
         self.con.executescript("CREATE TABLE IF NOT EXISTS contacts(`name` TEXT NOT NULL, `email` TEXT NOT NULL UNIQUE, `phone` TEXT NOT NULL UNIQUE)")
         self.con.commit()
@@ -55,7 +58,7 @@ class Contacts(MycroftSkill):
 
     def get_con(self, mode="rw"):
         """Return a connection to the sqlite database."""
-        return sqlite3.connect(f"file:database/contacts-skill/contacts.db?mode={mode}", uri=True)
+        return sqlite3.connect(f"file:{self.db_path}?mode={mode}", uri=True)
 
     @intent_handler("AddContact.intent")
     def add_contact(self, message):
