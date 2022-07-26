@@ -13,11 +13,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from mycroft import MycroftSkill, intent_handler
-from mycroft.skills import skill_api_method
+from mycroft            import MycroftSkill, intent_handler
+from mycroft.skills     import skill_api_method
 from mycroft.messagebus import Message
 from mycroft.util.parse import fuzzy_match
-from pathlib import Path
+from pathlib            import Path
 import sqlite3
 
 class Contacts(MycroftSkill):
@@ -64,11 +64,15 @@ class Contacts(MycroftSkill):
     def add_contact(self, message):
         """Ask for name, email and phone number. Then try to insert that contact into the database."""
         name  = self.get_response("AskForName")
-        email = self.get_response("AskForEmail")
-        phone = self.get_response("AskForPhone")
+        if name is None:
+            return
 
-        if not name or not email or not phone:
-            self.speak_dialog("CouldNotAdd")
+        email = self.get_response("AskForEmail")
+        if email is None:
+            return
+
+        phone = self.get_response("AskForPhone")
+        if phone is None:
             return
 
         email = email.replace("punkt", ".").replace("snabel-a", "@").replace("snabela", "@").replace(" ", "")
