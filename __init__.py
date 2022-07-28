@@ -108,14 +108,29 @@ class Contacts(MycroftSkill):
 
     @intent_handler("RemoveContact.intent")
     def remove_contact(self, message):
-        """Ask for the contact to be removed. If multiple contacts are found use ask_selection and match by phone number."""
-        response = self.get_response("Who")
-        if not response:
-            return
+        """Intent for removing a contact when name is specified."""
+        name = message.data.get("name", None)
 
-        best_match = self.get_best_match(response)
+        if not name:
+            return self.remove_contact_unspecified(message)
+        
+        self._remove_contact(name)
+    
+    @intent_handler("RemoveContactUnspecified.intent")
+    def remove_contact_unspecified(self, message):
+        """Intent for removing a contact when name is not specified."""
+        name = self.get_response("Who")
+        if not name:
+            return
+        
+        self._remove_contact(name)
+    
+
+    def _remove_contact(self, name):
+        """Find the best matching contact and remove it. If multiple contacts are found use ask_selection and match by phone number."""
+        best_match = self.get_best_match(name)
         if len(best_match) <= 0:
-            self.speak_dialog("NotFound", {"name": response})
+            self.speak_dialog("NotFound", {"name": name})
             return
         elif len(best_match) == 1:
             contact = {"name": best_match[0][0], "email": best_match[0][1], "phone": best_match[0][2]}
@@ -129,7 +144,6 @@ class Contacts(MycroftSkill):
 
         self.__confirm_removal(contact)
         self.__emit_all_contacts(self.__get_contacts(self.get_con()))
-        
     
     def __confirm_removal(self, contact):
         """Ask yes/no to confirm removing the contact"""

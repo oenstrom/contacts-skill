@@ -1,1 +1,1 @@
-(throw away|remove|delete|erase)(contact|person|contact person)(from|)(the|)(address book|)
+(throw away|remove|delete|erase)(the|)(contact|person|contact person){name}
