@@ -155,6 +155,10 @@ class Contacts(MycroftSkill):
     @skill_api_method
     def get_best_match(self, to_match):
         """Get the contact that matches the input the best."""
+        if to_match is None:
+            self.speak_dialog("NoMatch")
+            return False
+        
         contact_list = []
         try:
             self.con = self.get_con()
