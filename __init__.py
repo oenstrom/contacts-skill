@@ -153,7 +153,7 @@ class Contacts(MycroftSkill):
             self.speak_dialog("NotRemoved")
     
     @skill_api_method
-    def get_best_match(self, to_match):
+    def get_best_match(self, to_match:str):
         """Get the contact that matches the input the best."""
         if to_match is None:
             self.speak_dialog("NoMatch")
